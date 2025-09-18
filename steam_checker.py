@@ -110,49 +110,99 @@ class SteamCheckerThread(QThread):
             # Start playwright
             self.playwright = sync_playwright().start()
             
-            # Browser args
+            # Browser args - tối ưu cho tốc độ và đa luồng
             browser_args = [
+                # Core performance
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
-                "--disable-web-security",
-                "--disable-features=VizDisplayCompositor",
-                "--disable-images",
-                "--disable-javascript",
-                "--disable-css",
-                "--disable-fonts",
-                "--disable-webgl",
-                "--disable-3d-apis",
-                "--memory-pressure-off",
-                "--max_old_space_size=4096",
+                "--disable-gpu-sandbox",
+                "--disable-software-rasterizer",
+                "--disable-background-timer-throttling",
+                "--disable-renderer-backgrounding",
+                "--disable-backgrounding-occluded-windows",
+                "--disable-ipc-flooding-protection",
+                
+                # Network optimizations
+                "--aggressive-cache-discard",
                 "--disable-background-networking",
                 "--disable-background-sync",
-                "--disable-client-side-phishing-detection",
+                "--disable-background-timer-throttling",
                 "--disable-component-extensions-with-background-pages",
                 "--disable-domain-reliability",
+                "--disable-features=TranslateUI",
+                "--disable-features=BlinkGenPropertyTrees",
+                "--disable-features=CalculateNativeWinOcclusion",
+                "--disable-features=VizDisplayCompositor",
                 "--disable-features=AudioServiceOutOfProcess",
-                "--disable-features=TrustedTypes",
-                "--disable-features=TrustedTypesForScript",
-                "--disable-features=TrustedTypesForScriptURL",
-                "--disable-features=TrustedTypesForScriptElement",
-                "--disable-features=TrustedTypesForScriptText",
-                "--disable-features=TrustedTypesForScriptInnerHTML",
-                "--disable-features=TrustedTypesForScriptOuterHTML",
-                "--disable-features=TrustedTypesForScriptInsertAdjacentHTML",
-                "--disable-features=TrustedTypesForScriptWrite",
-                "--disable-features=TrustedTypesForScriptWriteln",
+                "--disable-features=MediaRouter",
+                "--disable-features=OptimizationHints",
+                "--disable-features=WebRTC",
+                "--disable-features=ServiceWorkerPaymentApps",
+                
+                # Memory optimizations
+                "--memory-pressure-off",
+                "--max_old_space_size=4096",
+                "--js-flags=--max-old-space-size=4096",
+                "--disable-extensions",
+                "--disable-plugins-discovery",
+                "--disable-sync",
+                "--disable-web-resources",
+                
+                # Security bypasses (for automation)
+                "--disable-web-security",
+                "--disable-features=TrustedTypes,TrustedTypesForScript,TrustedTypesForScriptURL,TrustedTypesForScriptElement,TrustedTypesForScriptText,TrustedTypesForScriptInnerHTML,TrustedTypesForScriptOuterHTML,TrustedTypesForScriptInsertAdjacentHTML,TrustedTypesForScriptWrite,TrustedTypesForScriptWriteln",
+                "--disable-hang-monitor",
+                "--disable-prompt-on-repost",
+                "--disable-client-side-phishing-detection",
+                "--disable-component-update",
+                "--disable-domain-reliability",
+                "--disable-features=BlockInsecurePrivateNetworkRequests",
+                
+                # UI/Visual optimizations - chỉ tắt images
+                "--disable-images",
+                "--disable-webgl",
+                "--disable-3d-apis",
+                "--disable-accelerated-2d-canvas",
+                "--disable-accelerated-jpeg-decoding",
+                "--disable-accelerated-mjpeg-decode",
+                "--disable-accelerated-video-decode",
+                "--disable-accelerated-video-encode",
+                "--disable-standard-fonts",
+                "--disable-default-apps",
+                "--disable-extensions-file-access-check",
+                "--disable-extensions-http-throttling",
+                "--disable-extensions-https-throttling",
+                
+                # Logging and debugging
                 "--log-level=3",
-                "--silent"
+                "--silent",
+                "--disable-logging",
+                "--disable-breakpad"
             ]
             
-            # Context options
+            # Context options - tối ưu cho tốc độ
             context_options = {
                 "headless": self.headless,
-                "viewport": {"width": 1280, "height": 720},
+                "viewport": {"width": 1024, "height": 768},  # Giảm kích thước viewport
                 "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "ignore_https_errors": True,
                 "bypass_csp": True,
-                "args": browser_args
+                "args": browser_args,
+                # Tối ưu network
+                "accept_downloads": False,
+                "has_touch": False,
+                "is_mobile": False,
+                "locale": "en-US",
+                "timezone_id": "UTC",
+                # Tắt các tính năng không cần thiết
+                "permissions": [],
+                "geolocation": None,
+                "color_scheme": "light",
+                "forced_colors": "none",
+                "reduced_motion": "reduce",
+                "screen": {"width": 1024, "height": 768},
+                "device_scale_factor": 1.0
             }
             
             # Setup proxy nếu cần
@@ -180,18 +230,37 @@ class SteamCheckerThread(QThread):
             )
             self.log_signal.emit(f"[Thread {self.thread_id}] Persistent context launched successfully")
             
-            # Create page
-            self.log_signal.emit(f"[Thread {self.thread_id}] Creating page...")
-            self.page = self.context.new_page()
-            self.log_signal.emit(f"[Thread {self.thread_id}] Page created successfully")
+            # Sử dụng page mặc định (không tạo tab mới)
+            self.log_signal.emit(f"[Thread {self.thread_id}] Using default page...")
+            self.page = self.context.pages[0] if self.context.pages else self.context.new_page()
+            self.log_signal.emit(f"[Thread {self.thread_id}] Page ready successfully")
             
-            # Set timeouts
+            # Set timeouts - giữ 60 giây như yêu cầu
             self.page.set_default_timeout(60000)  # 60 seconds
             self.page.set_default_navigation_timeout(60000)  # 60 seconds
             
-            # Disable images and CSS
-            self.page.route("**/*.{png,jpg,jpeg,gif,svg,webp,ico}", lambda route: route.abort())
-            self.page.route("**/*.{css,woff,woff2,ttf,eot}", lambda route: route.abort())
+            # Chỉ block images để tăng tốc độ, giữ lại CSS và JS cho Steam
+            def should_block_request(route):
+                url = route.request.url.lower()
+                # Chỉ block images
+                if any(ext in url for ext in ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico', '.bmp', '.tiff']):
+                    return route.abort()
+                # Block media files (video, audio)
+                if any(ext in url for ext in ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mp3', '.wav', '.ogg']):
+                    return route.abort()
+                # Block analytics và tracking
+                if any(domain in url for domain in ['google-analytics', 'googletagmanager', 'facebook.com/tr', 'doubleclick', 'googlesyndication']):
+                    return route.abort()
+                # Block ads
+                if any(domain in url for domain in ['ads', 'adnxs', 'amazon-adsystem', 'googlesyndication']):
+                    return route.abort()
+                # Block social media widgets
+                if any(domain in url for domain in ['facebook.com/plugins', 'twitter.com/widgets', 'instagram.com/embed']):
+                    return route.abort()
+                # Allow tất cả CSS, JS, fonts cho Steam
+                route.continue_()
+            
+            self.page.route("**/*", should_block_request)
             
             self.log_signal.emit(f"[Thread {self.thread_id}] Browser setup completed successfully")
             return True
@@ -201,14 +270,14 @@ class SteamCheckerThread(QThread):
             return False
     
     def check_account(self, email, password):
-        """Check một account Steam"""
+        """Check một account Steam - tối ưu tốc độ"""
         try:
             # Login
             self.page.goto("https://steamcommunity.com/login/home/?goto=")
-            self.page.wait_for_timeout(2000)
+            self.page.wait_for_timeout(1000)  # Giảm từ 2000ms xuống 1000ms
             
-            # Tìm và điền form login
-            email_input = self.page.wait_for_selector("input._2GBWeup5cttgbTw8FM3tfx[type='text']", timeout=60000)
+            # Tìm và điền form login với timeout ngắn hơn
+            email_input = self.page.wait_for_selector("input._2GBWeup5cttgbTw8FM3tfx[type='text']", timeout=20000)  # Giảm từ 60000ms
             password_input = self.page.query_selector("input._2GBWeup5cttgbTw8FM3tfx[type='password']")
             
             email_input.fill(email)
@@ -218,8 +287,8 @@ class SteamCheckerThread(QThread):
             login_button = self.page.query_selector("button.DjSvCZoKKfoNSmarsEcTS[type='submit']")
             login_button.click()
             
-            # Chờ kết quả login
-            self.page.wait_for_timeout(3000)
+            # Chờ kết quả login - giảm thời gian chờ
+            self.page.wait_for_timeout(2000)  # Giảm từ 3000ms xuống 2000ms
             
             # Kiểm tra xem có login thành công không - check error message
             try:
@@ -250,31 +319,31 @@ class SteamCheckerThread(QThread):
             return False
     
     def crawl_steam_data(self):
-        """Crawl dữ liệu từ Steam"""
+        """Crawl dữ liệu từ Steam - tối ưu tốc độ"""
         try:
             # Lấy SteamID từ account page
             self.page.goto("https://store.steampowered.com/account/")
-            self.page.wait_for_timeout(2000)
+            self.page.wait_for_timeout(1000)  # Giảm từ 2000ms xuống 1000ms
             
             steam_data = {}
             
             # SteamID
             try:
-                steamid_element = self.page.wait_for_selector("div.youraccount_steamid", timeout=20000)
+                steamid_element = self.page.wait_for_selector("div.youraccount_steamid", timeout=10000)  # Giảm từ 20000ms
                 steam_data['steamid'] = steamid_element.text_content().replace("Steam ID: ", "")
             except:
                 steam_data['steamid'] = "N/A"
             
             # Country
             try:
-                country_element = self.page.wait_for_selector("span.account_data_field", timeout=20000)
+                country_element = self.page.wait_for_selector("span.account_data_field", timeout=10000)  # Giảm từ 20000ms
                 steam_data['country'] = country_element.text_content()
             except:
                 steam_data['country'] = "N/A"
             
             # Balance
             try:
-                balance_element = self.page.wait_for_selector("div.accountRow.accountBalance", timeout=20000)
+                balance_element = self.page.wait_for_selector("div.accountRow.accountBalance", timeout=10000)  # Giảm từ 20000ms
                 steam_data['balance'] = balance_element.text_content()
             except:
                 steam_data['balance'] = "N/A"
@@ -283,18 +352,18 @@ class SteamCheckerThread(QThread):
             try:
                 profile_url = f"https://steamcommunity.com/profiles/{steam_data['steamid']}/"
                 self.page.goto(profile_url)
-                self.page.wait_for_timeout(2000)
+                self.page.wait_for_timeout(1000)  # Giảm từ 2000ms xuống 1000ms
                 
                 # Level
                 try:
-                    level_element = self.page.wait_for_selector("span.friendPlayerLevelNum", timeout=20000)
+                    level_element = self.page.wait_for_selector("span.friendPlayerLevelNum", timeout=10000)  # Giảm từ 20000ms
                     steam_data['level'] = level_element.text_content()
                 except:
                     steam_data['level'] = "0"
                 
                 # Suspects
                 try:
-                    suspect_element = self.page.wait_for_selector("div.profile_ban_status.ban_status_header", timeout=20000)
+                    suspect_element = self.page.wait_for_selector("div.profile_ban_status.ban_status_header", timeout=10000)  # Giảm từ 20000ms
                     if suspect_element and "Steam Support suspects your account may" in suspect_element.text_content():
                         steam_data['suspects'] = "YES"
                     else:
@@ -310,11 +379,11 @@ class SteamCheckerThread(QThread):
             try:
                 games_url = f"https://steamcommunity.com/profiles/{steam_data['steamid']}/games?tab=all"
                 self.page.goto(games_url)
-                self.page.wait_for_timeout(2000)
+                self.page.wait_for_timeout(1000)  # Giảm từ 2000ms xuống 1000ms
                 
                 # Total games
                 try:
-                    total_games_element = self.page.wait_for_selector("a.sectionTab.active span", timeout=20000)
+                    total_games_element = self.page.wait_for_selector("a.sectionTab.active span", timeout=10000)  # Giảm từ 20000ms
                     # Extract number from "All Games (5)" format
                     games_text = total_games_element.text_content()
                     if "All Games (" in games_text:
@@ -327,7 +396,7 @@ class SteamCheckerThread(QThread):
                 # Game list
                 try:
                     game_elements = self.page.query_selector_all("a._22awlPiAoaZjQMqxJhp-KP")
-                    games = [game.text_content() for game in game_elements[:5]]  # Reduced from 10 to 5 games
+                    games = [game.text_content() for game in game_elements[:5]]  # Giữ nguyên 5 games
                     steam_data['games'] = ",".join(games) if games else "N/A"
                 except:
                     steam_data['games'] = "N/A"
@@ -396,14 +465,10 @@ class SteamCheckerThread(QThread):
     def cleanup(self):
         """Cleanup browser và profile"""
         try:
+            # Không đóng page vì sử dụng page mặc định của context
             if self.page:
-                try:
-                    self.page.close()
-                    self.log_signal.emit(f"[Thread {self.thread_id}] Page closed")
-                except Exception as e:
-                    self.log_signal.emit(f"[Thread {self.thread_id}] Page cleanup error: {str(e)}")
-                finally:
-                    self.page = None
+                self.log_signal.emit(f"[Thread {self.thread_id}] Page will be closed with context")
+                self.page = None
             
             if self.context:
                 try:
@@ -852,27 +917,8 @@ class SteamCheckerMainWindow(QMainWindow):
             self.stop_checking()
         event.accept()
 
-def test_playwright():
-    """Test Playwright setup"""
-    try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto("https://www.google.com")
-            print("Playwright test successful!")
-            browser.close()
-        return True
-    except Exception as e:
-        print(f"Playwright test failed: {e}")
-        return False
 
 def main():
-    # Test Playwright first
-    if not test_playwright():
-        print("Playwright test failed. Please install: playwright install chromium")
-        return
-    
     app = QApplication(sys.argv)
     window = SteamCheckerMainWindow()
     window.show()
