@@ -1,3 +1,4 @@
+import random
 import sys
 import os
 import json
@@ -110,12 +111,11 @@ class SteamCheckerThread(QThread):
             # Start playwright
             self.playwright = sync_playwright().start()
             
-            # Browser args - tối ưu cho tốc độ và đa luồng
+            # Browser args - antidetected và giống người dùng thật
             browser_args = [
-                # Core performance
+                # Core performance - giữ lại một số tính năng để giống thật
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
-                "--disable-gpu",
                 "--disable-gpu-sandbox",
                 "--disable-software-rasterizer",
                 "--disable-background-timer-throttling",
@@ -123,11 +123,9 @@ class SteamCheckerThread(QThread):
                 "--disable-backgrounding-occluded-windows",
                 "--disable-ipc-flooding-protection",
                 
-                # Network optimizations
-                "--aggressive-cache-discard",
+                # Network optimizations - giảm để giống thật
                 "--disable-background-networking",
                 "--disable-background-sync",
-                "--disable-background-timer-throttling",
                 "--disable-component-extensions-with-background-pages",
                 "--disable-domain-reliability",
                 "--disable-features=TranslateUI",
@@ -137,7 +135,6 @@ class SteamCheckerThread(QThread):
                 "--disable-features=AudioServiceOutOfProcess",
                 "--disable-features=MediaRouter",
                 "--disable-features=OptimizationHints",
-                "--disable-features=WebRTC",
                 "--disable-features=ServiceWorkerPaymentApps",
                 
                 # Memory optimizations
@@ -147,9 +144,8 @@ class SteamCheckerThread(QThread):
                 "--disable-extensions",
                 "--disable-plugins-discovery",
                 "--disable-sync",
-                "--disable-web-resources",
                 
-                # Security bypasses (for automation)
+                # Security bypasses (for automation) - giảm để ít bị detect
                 "--disable-web-security",
                 "--disable-features=TrustedTypes,TrustedTypesForScript,TrustedTypesForScriptURL,TrustedTypesForScriptElement,TrustedTypesForScriptText,TrustedTypesForScriptInnerHTML,TrustedTypesForScriptOuterHTML,TrustedTypesForScriptInsertAdjacentHTML,TrustedTypesForScriptWrite,TrustedTypesForScriptWriteln",
                 "--disable-hang-monitor",
@@ -161,48 +157,96 @@ class SteamCheckerThread(QThread):
                 
                 # UI/Visual optimizations - chỉ tắt images
                 "--disable-images",
-                "--disable-webgl",
-                "--disable-3d-apis",
-                "--disable-accelerated-2d-canvas",
-                "--disable-accelerated-jpeg-decoding",
-                "--disable-accelerated-mjpeg-decode",
-                "--disable-accelerated-video-decode",
-                "--disable-accelerated-video-encode",
-                "--disable-standard-fonts",
-                "--disable-default-apps",
-                "--disable-extensions-file-access-check",
-                "--disable-extensions-http-throttling",
-                "--disable-extensions-https-throttling",
                 
-                # Logging and debugging
+                # Antidetected features
+                "--disable-blink-features=AutomationControlled",
+                "--disable-features=VizDisplayCompositor",
+                "--disable-ipc-flooding-protection",
+                "--disable-renderer-backgrounding",
+                "--disable-backgrounding-occluded-windows",
+                "--disable-features=TranslateUI",
+                "--disable-features=BlinkGenPropertyTrees",
+                "--disable-features=CalculateNativeWinOcclusion",
+                "--disable-features=AudioServiceOutOfProcess",
+                "--disable-features=MediaRouter",
+                "--disable-features=OptimizationHints",
+                "--disable-features=ServiceWorkerPaymentApps",
+                "--disable-features=WebRTC",
+                "--disable-features=TranslateUI",
+                "--disable-features=BlinkGenPropertyTrees",
+                "--disable-features=CalculateNativeWinOcclusion",
+                "--disable-features=VizDisplayCompositor",
+                "--disable-features=AudioServiceOutOfProcess",
+                "--disable-features=MediaRouter",
+                "--disable-features=OptimizationHints",
+                "--disable-features=ServiceWorkerPaymentApps",
+                
+                # Logging - giảm để ít bị detect
                 "--log-level=3",
-                "--silent",
-                "--disable-logging",
-                "--disable-breakpad"
+                "--silent"
             ]
             
-            # Context options - tối ưu cho tốc độ
+            # Context options - antidetected và giống người dùng thật
+            user_agents = [
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+            ]
+            
+            viewports = [
+                {"width": 1920, "height": 1080},
+                {"width": 1366, "height": 768},
+                {"width": 1440, "height": 900},
+                {"width": 1536, "height": 864},
+                {"width": 1280, "height": 720}
+            ]
+            
+            timezones = [
+                "America/New_York",
+                "America/Los_Angeles", 
+                "America/Chicago",
+                "Europe/London",
+                "Europe/Berlin",
+                "Asia/Tokyo"
+            ]
+            
             context_options = {
                 "headless": self.headless,
-                "viewport": {"width": 1024, "height": 768},  # Giảm kích thước viewport
-                "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "viewport": random.choice(viewports),  # Random viewport
+                "user_agent": random.choice(user_agents),  # Random user agent
                 "ignore_https_errors": True,
                 "bypass_csp": True,
                 "args": browser_args,
-                # Tối ưu network
-                "accept_downloads": False,
+                # Network settings giống thật
+                "accept_downloads": True,  # Cho phép download như người dùng thật
                 "has_touch": False,
                 "is_mobile": False,
                 "locale": "en-US",
-                "timezone_id": "UTC",
-                # Tắt các tính năng không cần thiết
-                "permissions": [],
-                "geolocation": None,
-                "color_scheme": "light",
+                "timezone_id": random.choice(timezones),  # Random timezone
+                # Permissions giống thật
+                "permissions": ["geolocation", "notifications"],  # Một số permissions cơ bản
+                "geolocation": {"latitude": random.uniform(25.0, 49.0), "longitude": random.uniform(-125.0, -66.0)},  # Random US location
+                "color_scheme": random.choice(["light", "dark"]),  # Random color scheme
                 "forced_colors": "none",
-                "reduced_motion": "reduce",
-                "screen": {"width": 1024, "height": 768},
-                "device_scale_factor": 1.0
+                "reduced_motion": "no-preference",  # Không giảm motion
+                "screen": random.choice(viewports),  # Random screen size
+                "device_scale_factor": random.choice([1.0, 1.25, 1.5]),  # Random scale
+                # Thêm headers giống người dùng thật
+                "extra_http_headers": {
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Accept-Encoding": "gzip, deflate, br",
+                    "DNT": "1",
+                    "Connection": "keep-alive",
+                    "Upgrade-Insecure-Requests": "1",
+                    "Sec-Fetch-Dest": "document",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-Site": "none",
+                    "Sec-Fetch-User": "?1",
+                    "Cache-Control": "max-age=0"
+                }
             }
             
             # Setup proxy nếu cần
@@ -262,6 +306,21 @@ class SteamCheckerThread(QThread):
             
             self.page.route("**/*", should_block_request)
             
+            # Thêm random mouse movements để giống người dùng thật
+            self.page.evaluate("""
+                // Random mouse movements
+                setInterval(() => {
+                    const x = Math.random() * window.innerWidth;
+                    const y = Math.random() * window.innerHeight;
+                    const event = new MouseEvent('mousemove', {
+                        clientX: x,
+                        clientY: y,
+                        bubbles: true
+                    });
+                    document.dispatchEvent(event);
+                }, Math.random() * 10000 + 5000); // Random 5-15 seconds
+            """)
+            
             self.log_signal.emit(f"[Thread {self.thread_id}] Browser setup completed successfully")
             return True
             
@@ -270,41 +329,87 @@ class SteamCheckerThread(QThread):
             return False
     
     def check_account(self, email, password):
-        """Check một account Steam - tối ưu tốc độ"""
+        """Check một account Steam - antidetected và giống người dùng thật"""
         try:
-            # Login
-            self.page.goto("https://steamcommunity.com/login/home/?goto=")
-            self.page.wait_for_timeout(1000)  # Giảm từ 2000ms xuống 1000ms
+            # Random delay trước khi bắt đầu
+            self.page.wait_for_timeout(random.randint(1000, 3000))
             
-            # Tìm và điền form login với timeout ngắn hơn
-            email_input = self.page.wait_for_selector("input._2GBWeup5cttgbTw8FM3tfx[type='text']", timeout=20000)  # Giảm từ 60000ms
+            # Login với hành động giống người dùng thật
+            self.log_signal.emit(f"[Thread {self.thread_id}] Navigating to Steam login...")
+            self.page.goto("https://steamcommunity.com/login/home/?goto=")
+            
+            # Chờ page load hoàn toàn
+            self.page.wait_for_timeout(random.randint(2000, 4000))
+            
+            # Scroll nhẹ để giống người dùng thật
+            self.page.evaluate("window.scrollTo(0, 100)")
+            self.page.wait_for_timeout(random.randint(500, 1500))
+            
+            # Tìm và điền form login với hành động giống thật
+            self.log_signal.emit(f"[Thread {self.thread_id}] Filling login form...")
+            email_input = self.page.wait_for_selector("input._2GBWeup5cttgbTw8FM3tfx[type='text']", timeout=30000)
             password_input = self.page.query_selector("input._2GBWeup5cttgbTw8FM3tfx[type='password']")
             
-            email_input.fill(email)
-            password_input.fill(password)
+            # Click vào input trước khi type (giống người dùng thật)
+            email_input.click()
+            self.page.wait_for_timeout(random.randint(200, 500))
             
-            # Click login
+            # Type từng ký tự với random delay
+            for char in email:
+                email_input.type(char)
+                self.page.wait_for_timeout(random.randint(50, 150))
+            
+            # Random delay giữa các field
+            self.page.wait_for_timeout(random.randint(300, 800))
+            
+            # Click vào password input
+            password_input.click()
+            self.page.wait_for_timeout(random.randint(200, 500))
+            
+            # Type password từng ký tự
+            for char in password:
+                password_input.type(char)
+                self.page.wait_for_timeout(random.randint(50, 150))
+            
+            # Random delay trước khi submit
+            self.page.wait_for_timeout(random.randint(500, 1500))
+            
+            # Click login button
+            self.log_signal.emit(f"[Thread {self.thread_id}] Submitting login form...")
             login_button = self.page.query_selector("button.DjSvCZoKKfoNSmarsEcTS[type='submit']")
             login_button.click()
             
-            # Chờ kết quả login - giảm thời gian chờ
-            self.page.wait_for_timeout(2000)  # Giảm từ 3000ms xuống 2000ms
+            # Chờ kết quả login với random delay
+            self.page.wait_for_timeout(random.randint(3000, 5000))
             
-            # Kiểm tra xem có login thành công không - check error message
+            # Kiểm tra các loại lỗi khác nhau
+            current_url = self.page.url.lower()
+            page_content = self.page.content()
+            
+            # Check for Steam error page
+            if "something went wrong" in page_content.lower() or "please try again later" in page_content.lower():
+                self.log_signal.emit(f"[Thread {self.thread_id}] Steam server error for {email}")
+                self.write_error(email, password, "Steam server error")
+                return False
+            
+            # Check for wrong password
             try:
                 error_element = self.page.query_selector("div._1W_6HXiG4JJ0By1qN_0fGZ")
                 if error_element and "Please check your password and account name and try again" in error_element.text_content():
-                    # Login failed - wrong password
+                    self.log_signal.emit(f"[Thread {self.thread_id}] Wrong password for {email}")
                     self.write_wrong_password(email, password)
                     return False
             except:
-                # No error message found, check URL
-                if "login" in self.page.url.lower():
-                    # Login failed
-                    self.write_wrong_password(email, password)
-                    return False
+                pass
+            
+            # Check if still on login page
+            if "login" in current_url:
+                self.log_signal.emit(f"[Thread {self.thread_id}] Login failed for {email}")
+                self.write_wrong_password(email, password)
+                return False
             
             # Login thành công, crawl dữ liệu
+            self.log_signal.emit(f"[Thread {self.thread_id}] Login successful for {email}, crawling data...")
             steam_data = self.crawl_steam_data()
             if steam_data:
                 self.write_results(email, password, steam_data)
@@ -319,45 +424,58 @@ class SteamCheckerThread(QThread):
             return False
     
     def crawl_steam_data(self):
-        """Crawl dữ liệu từ Steam - tối ưu tốc độ"""
+        """Crawl dữ liệu từ Steam - antidetected và giống người dùng thật"""
         try:
+            # Random delay trước khi crawl
+            self.page.wait_for_timeout(random.randint(1000, 2500))
+            
             # Lấy SteamID từ account page
+            self.log_signal.emit(f"[Thread {self.thread_id}] Navigating to account page...")
             self.page.goto("https://store.steampowered.com/account/")
-            self.page.wait_for_timeout(1000)  # Giảm từ 2000ms xuống 1000ms
+            self.page.wait_for_timeout(random.randint(2000, 4000))  # Chờ page load
+            
+            # Scroll để giống người dùng thật
+            self.page.evaluate("window.scrollTo(0, 200)")
+            self.page.wait_for_timeout(random.randint(500, 1200))
             
             steam_data = {}
             
             # SteamID
             try:
                 steamid_element = self.page.wait_for_selector("div.youraccount_steamid", timeout=10000)  # Giảm từ 20000ms
-                steam_data['steamid'] = steamid_element.text_content().replace("Steam ID: ", "")
+                steam_data['steamid'] = steamid_element.text_content().replace("Steam ID: ", "").strip().replace('\n', ' ').replace('\r', ' ')
             except:
                 steam_data['steamid'] = "N/A"
             
             # Country
             try:
                 country_element = self.page.wait_for_selector("span.account_data_field", timeout=10000)  # Giảm từ 20000ms
-                steam_data['country'] = country_element.text_content()
+                steam_data['country'] = country_element.text_content().strip().replace('\n', ' ').replace('\r', ' ')
             except:
                 steam_data['country'] = "N/A"
             
             # Balance
             try:
                 balance_element = self.page.wait_for_selector("div.accountRow.accountBalance", timeout=10000)  # Giảm từ 20000ms
-                steam_data['balance'] = balance_element.text_content()
+                steam_data['balance'] = balance_element.text_content().strip().replace('\n', ' ').replace('\r', ' ')
             except:
                 steam_data['balance'] = "N/A"
             
             # Level và Suspects từ profile
             try:
                 profile_url = f"https://steamcommunity.com/profiles/{steam_data['steamid']}/"
+                self.log_signal.emit(f"[Thread {self.thread_id}] Navigating to profile page...")
                 self.page.goto(profile_url)
-                self.page.wait_for_timeout(1000)  # Giảm từ 2000ms xuống 1000ms
+                self.page.wait_for_timeout(random.randint(2000, 4000))  # Random delay
+                
+                # Scroll để giống người dùng thật
+                self.page.evaluate("window.scrollTo(0, 300)")
+                self.page.wait_for_timeout(random.randint(500, 1200))
                 
                 # Level
                 try:
                     level_element = self.page.wait_for_selector("span.friendPlayerLevelNum", timeout=10000)  # Giảm từ 20000ms
-                    steam_data['level'] = level_element.text_content()
+                    steam_data['level'] = level_element.text_content().strip().replace('\n', ' ').replace('\r', ' ')
                 except:
                     steam_data['level'] = "0"
                 
@@ -378,14 +496,19 @@ class SteamCheckerThread(QThread):
             # Games từ games page
             try:
                 games_url = f"https://steamcommunity.com/profiles/{steam_data['steamid']}/games?tab=all"
+                self.log_signal.emit(f"[Thread {self.thread_id}] Navigating to games page...")
                 self.page.goto(games_url)
-                self.page.wait_for_timeout(1000)  # Giảm từ 2000ms xuống 1000ms
+                self.page.wait_for_timeout(random.randint(2000, 4000))  # Random delay
+                
+                # Scroll để giống người dùng thật
+                self.page.evaluate("window.scrollTo(0, 400)")
+                self.page.wait_for_timeout(random.randint(500, 1200))
                 
                 # Total games
                 try:
                     total_games_element = self.page.wait_for_selector("a.sectionTab.active span", timeout=10000)  # Giảm từ 20000ms
                     # Extract number from "All Games (5)" format
-                    games_text = total_games_element.text_content()
+                    games_text = total_games_element.text_content().strip().replace('\n', ' ').replace('\r', ' ')
                     if "All Games (" in games_text:
                         steam_data['total_games'] = games_text.split("(")[1].split(")")[0]
                     else:
@@ -396,7 +519,7 @@ class SteamCheckerThread(QThread):
                 # Game list
                 try:
                     game_elements = self.page.query_selector_all("a._22awlPiAoaZjQMqxJhp-KP")
-                    games = [game.text_content() for game in game_elements[:5]]  # Giữ nguyên 5 games
+                    games = [game.text_content().strip().replace('\n', ' ').replace('\r', ' ') for game in game_elements[:5]]  # Giữ nguyên 5 games
                     steam_data['games'] = ",".join(games) if games else "N/A"
                 except:
                     steam_data['games'] = "N/A"
@@ -432,10 +555,29 @@ class SteamCheckerThread(QThread):
         except:
             return False
     
+    def clean_data(self, text):
+        """Làm sạch dữ liệu trước khi ghi file"""
+        if not text:
+            return "N/A"
+        # Loại bỏ xuống dòng và khoảng trắng thừa
+        cleaned = str(text).strip().replace('\n', ' ').replace('\r', ' ')
+        # Loại bỏ nhiều khoảng trắng liên tiếp
+        cleaned = ' '.join(cleaned.split())
+        return cleaned if cleaned else "N/A"
+    
     def write_results(self, email, password, steam_data):
         """Ghi kết quả thành công vào results.txt"""
         try:
-            line = f"{email}|{password}|{steam_data.get('steamid', 'N/A')}|{steam_data.get('country', 'N/A')}|{steam_data.get('balance', 'N/A')}|{steam_data.get('level', '0')}|{steam_data.get('suspects', 'NO')}|{steam_data.get('total_games', '0')}|{steam_data.get('games', 'N/A')}\n"
+            # Làm sạch tất cả dữ liệu trước khi ghi
+            steamid = self.clean_data(steam_data.get('steamid', 'N/A'))
+            country = self.clean_data(steam_data.get('country', 'N/A'))
+            balance = self.clean_data(steam_data.get('balance', 'N/A'))
+            level = self.clean_data(steam_data.get('level', '0'))
+            suspects = self.clean_data(steam_data.get('suspects', 'NO'))
+            total_games = self.clean_data(steam_data.get('total_games', '0'))
+            games = self.clean_data(steam_data.get('games', 'N/A'))
+            
+            line = f"{email}|{password}|{steamid}|{country}|{balance}|{level}|{suspects}|{total_games}|{games}\n"
             with open("results.txt", "a", encoding="utf-8") as f:
                 f.write(line)
                 f.flush()
@@ -594,8 +736,11 @@ class SteamCheckerMainWindow(QMainWindow):
         self.accounts_label = QLabel("No accounts loaded")
         self.add_accounts_btn = QPushButton("Add Accounts")
         self.add_accounts_btn.clicked.connect(self.load_accounts)
+        self.reload_accounts_btn = QPushButton("Reload & Skip Checked")
+        self.reload_accounts_btn.clicked.connect(self.reload_accounts)
         accounts_layout.addWidget(self.accounts_label)
         accounts_layout.addWidget(self.add_accounts_btn)
+        accounts_layout.addWidget(self.reload_accounts_btn)
         file_layout.addLayout(accounts_layout)
         
         # Proxies file
@@ -685,16 +830,89 @@ class SteamCheckerMainWindow(QMainWindow):
                     lines = f.readlines()
                 
                 self.accounts = []
+                skipped_count = 0
+                
                 for line in lines:
                     line = line.strip()
                     if line and ('|' in line or ':' in line):
+                        # Parse account
+                        if '|' in line:
+                            email, password = line.split('|', 1)
+                        elif ':' in line:
+                            email, password = line.split(':', 1)
+                        else:
+                            continue
+                        
+                        # Check if already processed
+                        if self.is_account_already_processed(email, password):
+                            skipped_count += 1
+                            continue
+                        
                         self.accounts.append(line)
                 
-                self.accounts_label.setText(f"Loaded {len(self.accounts)} accounts")
-                self.log(f"Loaded {len(self.accounts)} accounts from {file_path}")
+                self.accounts_label.setText(f"Loaded {len(self.accounts)} accounts (Skipped {skipped_count} already checked)")
+                self.log(f"Loaded {len(self.accounts)} accounts from {file_path} (Skipped {skipped_count} already checked)")
                 
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to load accounts: {str(e)}")
+    
+    def reload_accounts(self):
+        """Reload accounts và skip những account đã check"""
+        if not self.accounts:
+            QMessageBox.warning(self, "Warning", "No accounts loaded! Please load accounts first.")
+            return
+        
+        try:
+            # Reload từ danh sách hiện tại
+            original_accounts = self.accounts.copy()
+            self.accounts = []
+            skipped_count = 0
+            
+            for line in original_accounts:
+                # Parse account
+                if '|' in line:
+                    email, password = line.split('|', 1)
+                elif ':' in line:
+                    email, password = line.split(':', 1)
+                else:
+                    continue
+                
+                # Check if already processed
+                if self.is_account_already_processed(email, password):
+                    skipped_count += 1
+                    continue
+                
+                self.accounts.append(line)
+            
+            self.accounts_label.setText(f"Reloaded {len(self.accounts)} accounts (Skipped {skipped_count} already checked)")
+            self.log(f"Reloaded {len(self.accounts)} accounts (Skipped {skipped_count} already checked)")
+            
+            if skipped_count > 0:
+                QMessageBox.information(self, "Reload Complete", f"Reloaded {len(self.accounts)} accounts\nSkipped {skipped_count} already checked accounts")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to reload accounts: {str(e)}")
+    
+    def is_account_already_processed(self, email, password):
+        """Kiểm tra xem account đã được xử lý chưa (trong results.txt hoặc wrongpass.txt)"""
+        try:
+            # Check results.txt
+            if os.path.exists("results.txt"):
+                with open("results.txt", "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if f"{email}|{password}" in content:
+                        return True
+            
+            # Check wrongpass.txt
+            if os.path.exists("wrongpass.txt"):
+                with open("wrongpass.txt", "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if f"{email}|{password}" in content:
+                        return True
+                        
+            return False
+        except:
+            return False
     
     def load_proxies(self):
         """Load danh sách proxies từ file"""
