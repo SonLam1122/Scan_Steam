@@ -1233,7 +1233,7 @@ class SteamCheckerMainWindow(QMainWindow):
                 self.account_queue,
                 self.proxy_list,
                 self.use_proxy_cb.isChecked(),
-                self.headless_combo.currentText() == "Headless",
+                self.headless_combo.currentText() == "👻 Headless",
                 i + 1
             )
             thread.log_signal.connect(self.log_with_type)
@@ -1316,25 +1316,33 @@ class SteamCheckerMainWindow(QMainWindow):
     
     def on_account_progress(self, progress):
         """Callback khi có progress từ account"""
-        # Cập nhật target progress để animation timer có thể sử dụng
-        base_progress = int((self.checked_accounts / self.total_accounts) * 100)
-        current_account_progress = int((progress / 100) * (100 / self.total_accounts))
-        target_progress = min(base_progress + current_account_progress, 100)
-        
-        # Cập nhật target progress (sẽ được sử dụng bởi animation timer)
-        if target_progress > self.current_progress:
-            self.current_progress = target_progress
+        # Cập nhật progress ngay lập tức cho các bước quan trọng
+        if progress == 100:  # Account hoàn thành
+            # Cập nhật progress dựa trên số account đã check
+            new_progress = int((self.checked_accounts / self.total_accounts) * 100)
+            self.progress_bar.setValue(new_progress)
+        else:
+            # Cập nhật target progress để animation timer có thể sử dụng
+            base_progress = int((self.checked_accounts / self.total_accounts) * 100)
+            current_account_progress = int((progress / 100) * (100 / self.total_accounts))
+            target_progress = min(base_progress + current_account_progress, 100)
+            
+            # Cập nhật target progress (sẽ được sử dụng bởi animation timer)
+            if target_progress > self.current_progress:
+                self.current_progress = target_progress
     
     def on_thread_finished(self):
         """Callback khi thread hoàn thành"""
         self.checked_accounts += 1
-        # Progress sẽ được cập nhật tự động bởi animation timer
+        
+        # Cập nhật progress bar ngay lập tức
+        new_progress = int((self.checked_accounts / self.total_accounts) * 100)
+        self.progress_bar.setValue(new_progress)
         
         # Kiểm tra xem tất cả threads đã hoàn thành chưa
         all_finished = all(not thread.isRunning() for thread in self.threads)
         if all_finished:
             # Đảm bảo progress bar đạt 100% khi hoàn thành
-            self.current_progress = 100
             self.progress_bar.setValue(100)
             self.log_with_type(f"All accounts checked! Completed: {self.checked_accounts}/{self.total_accounts}", "success")
             self.stop_checking()
@@ -1462,7 +1470,8 @@ class SteamCheckerMainWindow(QMainWindow):
         
         profile_count = self.get_active_profiles_count()
         if profile_count > 0:
-            self.log(f"Active profiles: {profile_count}", "debug")  # Debug log - không cần thiết
+            # self.log_with_type(f"Active profiles: {profile_count}", "debug")  # Debug log - không cần thiết
+            pass
     
     def stop_profile_monitoring(self):
         """Dừng monitoring profiles"""
